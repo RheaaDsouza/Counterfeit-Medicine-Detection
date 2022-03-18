@@ -1,0 +1,20 @@
+body{
+    background-color: #2fb5b865!important;
+}
+.container{
+    margin-top: 40px;
+    padding: 80px;
+    size: cover;
+    background-color: white;
+    box-shadow: 0 2px 4px 0 black;
+}
+.btn {
+    background-color:#2fb5b865!important;
+}
+h3{
+    text-align: center;
+}
+
+form{
+    padding: 20px 20px 20px 20px;
+}
