@@ -2,3 +2,7 @@ flask
 pyrebase4
 firebase_admin
 flask_cors
+
+azure-cognitiveservices-vision-computervision
+python-dotenv
+PIL
