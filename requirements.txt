@@ -2,7 +2,12 @@ flask
 pyrebase4
 firebase_admin
 flask_cors
-
+numpy
+tensorflow
 azure-cognitiveservices-vision-computervision
 python-dotenv
 PIL
+scipy
+ipython
+matplotlib
+tf_slim
