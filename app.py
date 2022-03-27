@@ -2,11 +2,11 @@ from azure.cognitiveservices.vision.computervision import ComputerVisionClient
 from azure.cognitiveservices.vision.computervision.models import OperationStatusCodes
 from msrest.authentication import CognitiveServicesCredentials
 import time
-from PIL import Image
+
 from dotenv import load_dotenv
 load_dotenv()
-
-from flask import Flask, render_template, redirect, request, session, url_for,send_from_directory
+from werkzeug.utils import secure_filename
+from flask import Flask, render_template, redirect, request, session, url_for,send_from_directory,flash
 from firebase_admin import credentials, firestore, initialize_app
 import pyrebase
 import os
@@ -14,7 +14,40 @@ from firebase_admin import auth
 import json
 
 
+#####obj det import here
+import sys
+import numpy as np
+import tensorflow as tf
+from PIL import Image
+from inferenceutils import *
+
+sys.path.append("..")
+from object_detection.utils import label_map_util
+from object_detection.utils import visualization_utils as vis_util
+tf.config.set_visible_devices([], 'GPU')
+
+# from utils import visualization_utils as vis_util
+MODEL_NAME = r'C:\Users\Rhea\Desktop\Final\ssd_mobilenet_v2_fpnlite_320x320_coco17'
+PATH_TO_CKPT = r'C:\Users\Rhea\Desktop\Final\ssd_mobilenet_v2_fpnlite_320x320_coco17\saved_model'
+PATH_TO_LABELS = os.path.join('data', 'label_mapssdv2fpn320_5.pbtxt')
+NUM_CLASSES = 22
+
+category_index = label_map_util.create_category_index_from_labelmap(PATH_TO_LABELS, use_display_name=True)
+tf.keras.backend.clear_session()
+model = tf.saved_model.load(PATH_TO_CKPT)
+####################################
+
 app = Flask(__name__)
+
+app.config['OBJ_FOLDER']='static/objdetImages/'
+app.config['UPLOAD_FOLDER'] = 'static/uploads/'
+app.config['ALLOWED_EXTENSIONS'] = set(['png', 'jpg', 'jpeg'])
+
+
+def allowed_file(filename):
+    return '.' in filename and \
+           filename.rsplit('.', 1)[1] in app.config['ALLOWED_EXTENSIONS']
+
 ####################################
 # Azure stuff integration here
 subscription_key = os.getenv('subscription_key')
@@ -24,6 +57,7 @@ computervision_client = ComputerVisionClient(endpoint,CognitiveServicesCredentia
 
 dirname = os.path.dirname(__file__)
 
+'''
 def read_local(read):
     # Call API with image and raw response (allows you to get the operation location)
     read_response = computervision_client.read_in_stream(read, raw=True)
@@ -47,13 +81,15 @@ def read_local(read):
                 l.append(line.text)
     result=(' '.join(l))
     return result
+''' 
 
+#########################
 #using pyrebase
 config = {
-  "apiKey": "your api key",
-  "authDomain": "your domain",
-  "databaseURL": "your database url",
-  "storageBucket": "your storage bucket"
+    "apiKey": "your api key",
+    "authDomain": "your domain",
+    "databaseURL": "your database url",
+    "storageBucket": "your storage bucket"
 }
 
 firebase = pyrebase.initialize_app(config)
@@ -66,7 +102,7 @@ person = {"is_logged_in": False, "name": "", "email": "", "uid": ""}
 
 @app.route('/', methods=['GET','POST'])
 def main():
-    return render_template('index.html')
+    return render_template('home.html')
 
 #Login
 @app.route("/login")
@@ -85,10 +121,10 @@ def home():
     cred = credentials.Certificate('key.json')
     default_app = initialize_app(cred)
     db = firestore.client()
-
+    '''
     #Note: Use of CollectionRef stream() is prefered to get()
     docs = db.collection("meds").where("manufacturer", "==", "Zydus").stream()
-    '''
+    
     for doc in docs:
         print(f"{doc.id} => {doc.to_dict()}")
     '''
@@ -168,15 +204,78 @@ def logout():
     return redirect(url_for('main'))
 
 @app.route("/upload", methods = ['GET', 'POST'])
-def get_out():
+def upload():
+    file = request.files['file']
+    if file and allowed_file(file.filename):
+        filename = secure_filename(file.filename)
+        file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+        #return render_template('home.html', filename="/uploads/"+filename)
+        return redirect(url_for('uploaded_file',filename=filename))
+    '''
     if request.method == 'POST':
         file = request.files['i_remote']
-        
         #read image file string data
     result = read_local(file)
-    print(file)
-    image = Image.open(file)
-    return render_template("home.html", prediction = result ,img_path=image )
+    return render_template("home.html", prediction = result)
+    '''
 
+@app.route('/<filename>')
+def uploaded_file(filename):
+    PATH_TO_TEST_IMAGES_DIR = app.config['UPLOAD_FOLDER']
+    TEST_IMAGE_PATHS = [os.path.join(PATH_TO_TEST_IMAGES_DIR, filename.format(i)) for i in range(1, 2)]
+    IMAGE_SIZE = (12, 8)
+
+    for image_path in TEST_IMAGE_PATHS:
+        image_np = load_image_into_numpy_array(image_path)
+        output_dict = run_inference_for_single_image(model, image_np)
+        vis_util.visualize_boxes_and_labels_on_image_array(image_np,
+        output_dict['detection_boxes'],
+        output_dict['detection_classes'],
+        output_dict['detection_scores'],
+        category_index,
+        instance_masks=output_dict.get('detection_masks_reframed', None),
+        use_normalized_coordinates=True,
+        max_boxes_to_draw=5,
+        min_score_thresh=.7,
+        line_thickness=5)
+        display(Image.fromarray(image_np))
+        im = Image.fromarray(image_np)
+        #im.save('objdetImages/' + filename)
+        im.save( os.path.join(app.config['OBJ_FOLDER'], filename))
+        im_path= os.path.join(app.config['OBJ_FOLDER'], filename)
+        print(os.path.join(app.config['OBJ_FOLDER'], filename))
+        #return send_from_directory('uploads/',filename)
+        return render_template("home.html" , filename="uploads/"+filename, result=im_path)
+        # return render_template("home.html" , filename="uploads/"+filename, result=im_path)
+'''
+@app.route('/uploaded')
+def uploaded_file(filename):
+    PATH_TO_TEST_IMAGES_DIR = app.config['UPLOAD_FOLDER']
+    TEST_IMAGE_PATHS = [os.path.join(PATH_TO_TEST_IMAGES_DIR, filename.format(i)) for i in range(1, 2)]
+    IMAGE_SIZE = (12, 8)
+
+    for image_path in TEST_IMAGE_PATHS:
+        image_np = load_image_into_numpy_array(image_path)
+        output_dict = run_inference_for_single_image(model, image_np)
+        vis_util.visualize_boxes_and_labels_on_image_array(
+        image_np,
+        output_dict['detection_boxes'],
+        output_dict['detection_classes'],
+        output_dict['detection_scores'],
+        category_index,
+        instance_masks=output_dict.get('detection_masks_reframed', None),
+        use_normalized_coordinates=True,
+        max_boxes_to_draw=5,
+        min_score_thresh=.7,
+        line_thickness=5)
+        display(Image.fromarray(image_np))
+        im = Image.fromarray(image_np)
+        im.save('uploads/' + filename)
+    img_path= app.config['UPLOAD_FOLDER']+filename
+    #return send_from_directory("/upload", img_path)
+    return render_template("uploaded.html",img_path=img_path)
+'''
+    
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(debug=True, host='0.0.0.0', port=5000)
+    
