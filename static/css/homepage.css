@@ -1,3 +1,57 @@
 #pickFile{
-    padding-top: 100px;
+    padding-top: 90px;
 }
+
+.container{
+    padding-top: 20px;
+}
+
+.generate h6{
+    font-weight: 700;
+    padding: 10px;
+
+}
+
+.card-deck{
+    /*width: 800px;*/
+    padding: 25px;
+    justify-content: space-between;
+}
+
+.card {
+    box-shadow: 0 2px 2px 0 rgb(54, 54, 54);
+    align-items: center;
+}
+
+.stamp {
+    transform: rotate(12deg);
+    color: #555;
+    font-size: 3rem;
+    font-weight: 700;
+    border: 0.25rem solid #555;
+    display: inline-block;
+    padding: 0.25rem 1rem;
+    text-transform: uppercase;
+    border-radius: 1rem;
+    font-family: 'Courier';
+    -webkit-mask-image: url('https://s3-us-west-2.amazonaws.com/s.cdpn.io/8399/grunge.png');
+    -webkit-mask-size: 944px 604px;
+    mix-blend-mode: multiply;
+}
+  
+.is-nope {
+    color: #D23 !important;
+    border: 0.5rem double #D23 !important;
+    transform: rotate(3deg);
+    -webkit-mask-position: 2rem 3rem;
+    font-size: 2rem;  
+}
+  
+.is-approved {
+    color: #0A9928 !important;
+    border: 0.5rem solid #0A9928 !important;
+    -webkit-mask-position: 13rem 6rem;
+    transform: rotate(-14deg);
+    border-radius: 0;
+} 
+  

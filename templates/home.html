@@ -5,7 +5,7 @@
 		<meta charset="UTF-8">
 		<meta http-equiv="X-UA-Compatible" content="IE=edge">
 		<meta name="viewport" content="width=device-width, initial-scale=1.0">
-		<link rel="stylesheet" href="../static/css/styles.css">
+		<link rel="stylesheet" href="../static/css/styless.css">
 		<link rel="stylesheet" href="../static/css/homepage.css">
 		<script src="../static/js/script.js"></script>
 		<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.0/jquery.min.js"></script>
@@ -41,41 +41,97 @@
 
 	<section id='pickFile'>
 		<div class="container">
-			<form action = "/upload" method = "POST" enctype = "multipart/form-data">
-				<div class="custom-file">
-				  <input type="file" class="custom-file-input" id="customFile" name="file">
-				  <label class="custom-file-label" for="customFile">Choose file</label>
-				</div>
-
-				<div>
-					<button id="customFileAddon" type="submit" value="Upload" class="btn btn-success">Submit</button>
-				  </div>
-			</form>
-		</div>
-
-		<div class="row">
+			<div class="card bg-info text-white">
+				<div class="card-body">Upload your medicine image below</div>
+			</div>
 		</div>
 
 		<div class="container">
-			<!--
-			{% if prediction %}
-			<h5> Predicted Text: </h5> 
-			<h6 style="background-color: LightGray; padding: 70px 35px;">  {{prediction}} </h6>
-			{% endif %}
-		    -->
-			{% if filename %}
-			<div class="row">
-        	<div>
-				<h6>Original Image</h6>
-            	<img id="img" src="{{url_for('static',filename=filename)}}">
-        	</div>
-			<div>
-			<!--	<img src="{{url_for('uploaded_file',filename=nfilename)}}">-->
-			<h6>Processed Image</h6>
-			<img src="{{result}}">
-			</div>
-			{% endif %}
+			<form action = "/upload" method = "POST" enctype = "multipart/form-data">
+				<div class="row">
+					<div class="col-md-10">
+						<div class="custom-file">
+						  <input type="file" class="custom-file-input" id="customFile" name="file">
+						  <label class="custom-file-label" for="customFile">Choose file</label>
+						</div>
+					</div>
+		
+					<div class="col-md-2">
+						<button id="customFileAddon" type="submit" value="Upload" class="btn btn-success">Submit</button>
+					</div>
+				</div>
+			</form>
 		</div>
+        <div class="container"></div>
+		<div class="container generate">
+			{% if filename %}
+				<div class="card-deck">
+					<div class="card">
+						<h6 class="card-title">Uploaded Image</h6>
+						<div class="card-body">
+            			<img id="img" src="{{url_for('static',filename=filename)}}">
+						</div>
+					</div>
+                    
+					<div>
+						<div>
+							{% if value=="real" -%}
+								{% set row_class ="stamp is-approved"  %}
+								<span class="{{row_class}}">{{value}}</span>
+							{% elif value=="fake" -%}
+								{% set row_class =  "stamp is-nope" %}
+								<span class="{{row_class}}">{{value}}</span>
+							
+                            {% endif%}
+						</div>
+					</div>
+                    
+					<div class="card">
+						<h6 class="card-title">Processed Image</h6>
+						<div class="card-body">
+						<img id="img2" src="{{res}}">
+						</div>
+					</div>
+				</div>
+
+				<div class="container" style="margin:auto;max-width: 300px;">
+					<h4 style="text-align:center">Detections</h4>
+					<br>
+					<div id="results">
+				  	<table class="table" style="">
+				  		<tr>
+							<th></th>
+					  		<th>Detected</th>
+							<th></th>
+					  		<th>Score</th>
+				  		</tr>
+				  		{% for i in coordinates%}
+				  		<tr>
+					  		<!-- some glitch here but works for us -->
+					  		{% for v in i.values() %}
+						  	<td>{{ k }}</td>
+						  	<td>{{ v }}</td>
+					  		{% endfor %}
+				  		</tr>
+				  		{% endfor %}
+				  		</table>
+					</div>
+				</div>
+				
+				<div class="card">
+					<h6>Text verification</h6>
+					<p> Medicine Details</p>
+					{% if 'Not Found' in doc %}
+						<p>{{doc}}</p>
+						
+					{% else %}
+						{% for k,v in doc.items() -%}
+							<dt>{{k}}:</dt><dd>{{v}}</dd>
+		   				{% endfor %}
+					{% endif %}
+				</div>
+			{% endif %}
+		
 	</section>
 
 	<script>
@@ -86,24 +142,6 @@
 		  $(this).siblings(".custom-file-label").addClass("selected").html(fileName);
 
 		});
-        /*
-		function init() {
-			var inputFile = document.getElementById('customFile');
-			inputFile.addEventListener('change', mostrarImagen, false);
-		}
-		function mostrarImagen(event) {
-			var file = event.target.files[0];
-			var reader = new FileReader();
-			reader.onload = function (event) {
-				var img = document.getElementById('img');
-				img.src = event.target.result;
-				img.width = 500;
-				img.height = 500;
-			}
-			reader.readAsDataURL(file);
-		}
-		window.addEventListener('load', init, false);
-        */
-		</script>
+	</script>
 </body>
 </html>
