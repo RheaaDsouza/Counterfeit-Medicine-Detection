@@ -1,3 +1,4 @@
+from msilib.schema import AdminExecuteSequence
 from azure.cognitiveservices.vision.computervision import ComputerVisionClient
 from azure.cognitiveservices.vision.computervision.models import OperationStatusCodes
 from msrest.authentication import CognitiveServicesCredentials
@@ -7,6 +8,7 @@ from dotenv import load_dotenv
 load_dotenv()
 from werkzeug.utils import secure_filename
 from flask import Flask, render_template, redirect, request, session, url_for,send_from_directory,flash
+import firebase_admin
 from firebase_admin import credentials, firestore, initialize_app
 import pyrebase
 import os
@@ -20,6 +22,10 @@ import numpy as np
 import tensorflow as tf
 from PIL import Image
 from inferenceutils import *
+import cv2
+import pytesseract
+
+pytesseract.pytesseract.tesseract_cmd = 'C:/Program Files/Tesseract-OCR/tesseract.exe'
 
 sys.path.append("..")
 from object_detection.utils import label_map_util
@@ -57,7 +63,7 @@ computervision_client = ComputerVisionClient(endpoint,CognitiveServicesCredentia
 
 dirname = os.path.dirname(__file__)
 
-'''
+
 def read_local(read):
     # Call API with image and raw response (allows you to get the operation location)
     read_response = computervision_client.read_in_stream(read, raw=True)
@@ -81,28 +87,41 @@ def read_local(read):
                 l.append(line.text)
     result=(' '.join(l))
     return result
-''' 
+
 
 #########################
 #using pyrebase
+
 config = {
-    "apiKey": "your api key",
-    "authDomain": "your domain",
-    "databaseURL": "your database url",
-    "storageBucket": "your storage bucket"
+  "apiKey": "AIzaSyCEmFlaiGKWWho6kZnxLPtVrK0IybTMjfM",
+  "authDomain": "meddetection.firebaseapp.com",
+  "databaseURL": "https://meddetection-default-rtdb.firebaseio.com",
+  "storageBucket": "meddetection.appspot.com"
 }
 
-firebase = pyrebase.initialize_app(config)
-auth = firebase.auth()
-db = firebase.database()
-    
-#Initialze person as dictionary
+
+##################
+#trying firebase-admin
+
+#service account credentials
+cred = credentials.Certificate('key.json')
+#initializing the app
+firebase = firebase_admin.initialize_app(cred)
+db=firestore.client()
+
+pb = pyrebase.initialize_app(config)
+auth = pb.auth()
+database= pb.database()
+
+
+
 person = {"is_logged_in": False, "name": "", "email": "", "uid": ""}
+
 
 
 @app.route('/', methods=['GET','POST'])
 def main():
-    return render_template('home.html')
+    return render_template('index.html')
 
 #Login
 @app.route("/login")
@@ -117,17 +136,6 @@ def signup():
 #Homepage
 @app.route("/home")
 def home():
-    # Initialize Firestore DB using firebase admin
-    cred = credentials.Certificate('key.json')
-    default_app = initialize_app(cred)
-    db = firestore.client()
-    '''
-    #Note: Use of CollectionRef stream() is prefered to get()
-    docs = db.collection("meds").where("manufacturer", "==", "Zydus").stream()
-    
-    for doc in docs:
-        print(f"{doc.id} => {doc.to_dict()}")
-    '''
     if person["is_logged_in"] == True:
         return render_template("home.html", email = person["email"], name = person["name"])
     else:
@@ -145,13 +153,14 @@ def result():
         try:
             #signing in the user with the given information
             user = auth.sign_in_with_email_and_password(email, password)
+            print(user)
             #Insert the user data in the global person
             global person
             person["is_logged_in"] = True
             person["email"] = user["email"]
             person["uid"] = user["localId"]
             #Get the name of the user
-            data = db.child("users").get()
+            data = database.child("users").get()
             person["name"] = data.val()[person["uid"]]["name"]
             #Redirect to home page
             return redirect(url_for('home'))
@@ -174,7 +183,7 @@ def register():
         name = result["name"]
         try:
             #creating the user account using the provided data
-            auth.create_user_with_email_and_password(email, password)
+            user = auth.create_user_with_email_and_password(email, password)
             #Login the user
             user = auth.sign_in_with_email_and_password(email, password)
             #Add data to global person
@@ -185,7 +194,7 @@ def register():
             person["name"] = name
             #Append data to the firebase realtime database
             data = {"name": name, "email": email}
-            db.child("users").child(person["uid"]).set(data)
+            database.child("users").child(person["uid"]).set(data)
             #Go to welcome page
             return redirect(url_for('home'))
         except:
@@ -209,18 +218,11 @@ def upload():
     if file and allowed_file(file.filename):
         filename = secure_filename(file.filename)
         file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
-        #return render_template('home.html', filename="/uploads/"+filename)
         return redirect(url_for('uploaded_file',filename=filename))
-    '''
-    if request.method == 'POST':
-        file = request.files['i_remote']
-        #read image file string data
-    result = read_local(file)
-    return render_template("home.html", prediction = result)
-    '''
 
 @app.route('/<filename>')
 def uploaded_file(filename):
+    
     PATH_TO_TEST_IMAGES_DIR = app.config['UPLOAD_FOLDER']
     TEST_IMAGE_PATHS = [os.path.join(PATH_TO_TEST_IMAGES_DIR, filename.format(i)) for i in range(1, 2)]
     IMAGE_SIZE = (12, 8)
@@ -237,44 +239,123 @@ def uploaded_file(filename):
         use_normalized_coordinates=True,
         max_boxes_to_draw=5,
         min_score_thresh=.7,
-        line_thickness=5)
+        line_thickness=3)
         display(Image.fromarray(image_np))
         im = Image.fromarray(image_np)
         #im.save('objdetImages/' + filename)
         im.save( os.path.join(app.config['OBJ_FOLDER'], filename))
         im_path= os.path.join(app.config['OBJ_FOLDER'], filename)
         print(os.path.join(app.config['OBJ_FOLDER'], filename))
-        #return send_from_directory('uploads/',filename)
-        return render_template("home.html" , filename="uploads/"+filename, result=im_path)
-        # return render_template("home.html" , filename="uploads/"+filename, result=im_path)
-'''
-@app.route('/uploaded')
-def uploaded_file(filename):
-    PATH_TO_TEST_IMAGES_DIR = app.config['UPLOAD_FOLDER']
-    TEST_IMAGE_PATHS = [os.path.join(PATH_TO_TEST_IMAGES_DIR, filename.format(i)) for i in range(1, 2)]
-    IMAGE_SIZE = (12, 8)
+        
+        label_id_offset =0
+        ###additional code from jupter notebook
+        # This is the way I'm getting my coordinates
+        boxes = output_dict['detection_boxes']
+        # get all boxes from an array
+        max_boxes_to_draw = boxes.shape[0]
+        # get scores to get a threshold
+        scores = output_dict['detection_scores']
+        # this is set as a default but feel free to adjust it to your needs
+        min_score_thresh=.8
+        # iterate over all objects found
+        dictionary ={}
+        coordinates = []
+        
+        for i in range(min(max_boxes_to_draw, boxes.shape[0])):
+            # 
+            if scores is None or scores[i] > min_score_thresh:
+                class_name = category_index[output_dict['detection_classes'][i]+label_id_offset]['name']
+                dictionary[class_name]=list(boxes[i])
+                coordinates.append({"class_name": class_name,"score": scores[i]*100})#,"box": list(boxes[i])})
+        print(dictionary)
+        print(coordinates)
+        
+        img = cv2.imread(app.config['UPLOAD_FOLDER']+filename)
+        try:
+            if 'medname' in dictionary:
+                #print(dictionary['composition'])
+                left,top,width,height=[i for i in dictionary['medname']]
+        except:
+            print('error')
+        im_width, im_height, chn = img.shape
+        x = int(left * im_width)
+        y = int(top * im_height)
+        width = int(width * im_width)
+        height =int(height * im_height)
+        print(image_path)
+        im = Image.open(image_path)
+        im = im.crop((y,x,height,width))
+        im.save('textextract/img_0.png')
+        roi = Image.open('textextract/img_0.png')
+        data = pytesseract.image_to_string(roi)
+        print("pytesseract:",data)
+        
+        
+        ####Azure below####
+        #read image file string data
+        #print(file)
+        img = Image.open('C:/Users/Rhea/Desktop/Final/textextract/img_0.png')
+        ##resize values-check
+        ns = (210,90)
+        img = img.resize(ns)
+        img.save('textextract/resize.png')
+        img='C:/Users/Rhea/Desktop/Final/textextract/resize.png'
+        # image requirements - Supported image formats: JPEG, PNG, GIF, BMP.Image file size must be less than 4MB.
+        # Image dimensions must be between 50 x 50 and 4200 x 4200 pixels, and the image cannot be larger than 10 megapixels.
+        #img ='C:/Users/Rachael/Major_project/obj_flaskapp/Counterfeit-Medicine-Detection/img_0.png'
+        read_image = open(img, "rb")
+        result = read_local(read_image)
+        #image = Image.open(file)
+        print("Azure ocr:",result)
+        if result:
+            for i in coordinates:
+                for k,v in i.items():
+                    if v=='medname':
+                        #print(k,v)
+                        i[k]='medname:'+result
+        else:
+            for i in coordinates:
+                for k,v in i.items():
+                    if v=='medname':
+                        print(k,v)
+                        i[k]='medname:'+data
+        ######################################
+        result= result.lower()
+        
+        #Note: Use of CollectionRef stream() is prefered to get()
+        docs = db.collection("meds").where("name", "==", result).stream()
+        text_val=""
+        mydict={}
+        for doc in docs:
+            print(f"{doc.id} => {doc.to_dict()}")
+            doc= doc.to_dict()
+            for key, value in doc.items():
+                if key=='image-src':
+                    continue
+                else:
+                    mydict[key]=value
+            #mydict=doc.copy()
+            print(mydict)
+            break
+        else:
+            mydict['Not Found']="No match found in the Database"
+            text_val="fake"
+        
+        #####################################
+        #real fake classification
+        medlist=['Biocon_counterfeit','Emcure_counterfeit','Fresenius_counterfeit','Glenmark_counterfeit','Hetero_counterfeit','Intas_counterfeit','Neon_counterfeit','Panacea_counterfeit','Sun_Pharma_counterfeit','Zydus_counterfeit']
+        for k in dictionary:
+            if k in medlist:
+                value = 'fake'
+                break
+            else:
+                value = 'real'
+        print("value:",value)
+        
+        if value=="fake" or text_val=="fake":
+            value="fake"
+    return render_template("home.html" , filename="uploads/"+filename, res=im_path, coordinates=coordinates, img=img, doc=mydict, name=person["name"], value=value)
 
-    for image_path in TEST_IMAGE_PATHS:
-        image_np = load_image_into_numpy_array(image_path)
-        output_dict = run_inference_for_single_image(model, image_np)
-        vis_util.visualize_boxes_and_labels_on_image_array(
-        image_np,
-        output_dict['detection_boxes'],
-        output_dict['detection_classes'],
-        output_dict['detection_scores'],
-        category_index,
-        instance_masks=output_dict.get('detection_masks_reframed', None),
-        use_normalized_coordinates=True,
-        max_boxes_to_draw=5,
-        min_score_thresh=.7,
-        line_thickness=5)
-        display(Image.fromarray(image_np))
-        im = Image.fromarray(image_np)
-        im.save('uploads/' + filename)
-    img_path= app.config['UPLOAD_FOLDER']+filename
-    #return send_from_directory("/upload", img_path)
-    return render_template("uploaded.html",img_path=img_path)
-'''
     
 if __name__ == "__main__":
     app.run(debug=True, host='0.0.0.0', port=5000)
