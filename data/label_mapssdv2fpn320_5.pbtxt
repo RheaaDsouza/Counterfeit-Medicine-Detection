@@ -1,0 +1,88 @@
+item { 
+	name:'Biocon_Limited'
+	id:1
+}
+item { 
+	name:'Emcure_Pharma'
+	id:2
+}
+item { 
+	name:'Fresenius_Kabi'
+	id:3
+}
+item { 
+	name:'Glenmark'
+	id:4
+}
+item { 
+	name:'Hetero'
+	id:5
+}
+item { 
+	name:'Intas_Pharma'
+	id:6
+}
+item { 
+	name:'Neon_labs'
+	id:7
+}
+item { 
+	name:'Panacea_Biotec'
+	id:8
+}
+item { 
+	name:'Sun_Pharma'
+	id:9
+}
+item { 
+	name:'Zydus'
+	id:10
+}
+item { 
+	name:'Biocon_counterfeit'
+	id:11
+}
+item { 
+	name:'Emcure_counterfeit'
+	id:12
+}
+item { 
+	name:'Fresenius_counterfeit'
+	id:13
+}
+item { 
+	name:'Glenmark_counterfeit'
+	id:14
+}
+item { 
+	name:'Hetero_counterfeit'
+	id:15
+}
+item { 
+	name:'Intas_counterfeit'
+	id:16
+}
+item { 
+	name:'Neon_counterfeit'
+	id:17
+}
+item { 
+	name:'Panacea_counterfeit'
+	id:18
+}
+item { 
+	name:'Sun_Pharma_counterfeit'
+	id:19
+}
+item { 
+	name:'Zydus_counterfeit'
+	id:20
+}
+item { 
+	name:'medname'
+	id:21
+}
+item { 
+	name:'composition'
+	id:22
+}
